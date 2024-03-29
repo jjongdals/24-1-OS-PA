@@ -15,6 +15,8 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 /***********************************************************************
  * run_command()
@@ -31,7 +33,32 @@
 int run_command(int nr_tokens, char *tokens[])
 {
 	if (strcmp(tokens[0], "exit") == 0) return 0;
+	//fork를 뭘 생각하라는거지??? 뭔말이지???
+	//nr_token이 token의 개수를 얘기하는 거 같은데 token 개수 세고
+	if(nr_tokens > 1) {
+		//각각의 토큰의 길이를 계산한 담에
 
+		//cd 
+		if(strcmp(tokens[0], "cd") == 0) {
+
+		}
+	}
+
+	else {
+		// nr_token = 1 뭔가 실행하면 될 거 같음
+
+		//ls
+		if(strcmp(tokens[0], "ls") == 0) {
+			execl()
+		}
+		//pwd
+		if(strcmp(tokens[0], "pwd") == 0) {
+
+		}
+
+	}
+	
+	
 	return -1;
 }
 
@@ -49,6 +76,12 @@ int run_command(int nr_tokens, char *tokens[])
  */
 int initialize(int argc, char * const argv[])
 {
+	if() {
+
+	}
+	else {
+
+	}
 	return 0;
 }
 
