@@ -33,36 +33,40 @@
 int run_command(int nr_tokens, char *tokens[])
 {
 	if (strcmp(tokens[0], "exit") == 0) return 0;
-	//fork를 뭘 생각하라는거지??? 뭔말이지???
 	//nr_token이 token의 개수를 얘기하는 거 같은데 token 개수 세고
 	if(nr_tokens > 1) {
-		//각각의 토큰의 길이를 계산한 담에
-
-		//cd 
-		if(strcmp(tokens[0], "cd") == 0) {
-
+	}
+	//nr_tokens = 1일 때 체크
+	else if (nr_tokens == 1) {
+		pid_t pid;
+		int status, result = 0;
+		//fork의 반환을 pid에 저장
+		pid = fork();
+		//fork의 반환값이 0이라면, 자식 프로세스임
+		if(pid == 0){
+			//execvp의 반환값을 result에 저장, result가 -1이면 실패
+			result = execvp(tokens[0], tokens);
+			//execvp가 실패하면 에러 반환 및 부모 프로세스로 돌아감
+			if (result == -1) {
+				exit(1);	
+			}
+			else {
+			// 성공하면 exit(0)으로 부모 프로세스에게 정보 반환
+				exit(0);
+			}
+		}	
+		//자식 프로세스가 끝날 때까지 부모 프로세스는 대기
+		wait(&status);
+		//stauts가 0이면 성공, 아니면 실패
+		if(status == 0) {
+			return 1;
+		}
+		else {
+			return -1;
 		}
 	}
-
-	else {
-		// nr_token = 1 뭔가 실행하면 될 거 같음
-
-		//ls
-		if(strcmp(tokens[0], "ls") == 0) {
-			execl()
-		}
-		//pwd
-		if(strcmp(tokens[0], "pwd") == 0) {
-
-		}
-
-	}
-	
-	
 	return -1;
 }
-
-
 /***********************************************************************
  * initialize()
  *
@@ -76,12 +80,6 @@ int run_command(int nr_tokens, char *tokens[])
  */
 int initialize(int argc, char * const argv[])
 {
-	if() {
-
-	}
-	else {
-
-	}
 	return 0;
 }
 
