@@ -32,38 +32,46 @@
  */
 int run_command(int nr_tokens, char *tokens[])
 {
-	if (strcmp(tokens[0], "exit") == 0) return 0;
-	//nr_token이 token의 개수를 얘기하는 거 같은데 token 개수 세고
-	if(nr_tokens > 1) {
+	if (strcmp(tokens[0], "exit") == 0) return 0; // exit일 경우
+	pid_t pid;
+	int status, result = 0;
+	// cd일 경우
+	if (strcmp(tokens[0], "cd") == 0) {
+		//디렉토리를 변경할 경우, 두번째 토큰에 path가 전달됨 따라서 dir 문자열에 token의 두번째 토큰값 전달
+		char *dir = tokens[1]; 
+		//cd나 cd ~ 일 경우 사용자의 홈디렉토리로 변경
+		if (tokens[1] == NULL || strcmp(tokens[1], "~") == 0) {
+			dir = getenv("HOME"); 
+		}
+		//디렉토리 변경에 실패할 경우엔 -1 반환 아니면 1 반환
+		if (chdir(dir) != 0) { 
+			return -1; 
+		}
+		return 1; 
 	}
-	//nr_tokens = 1일 때 체크
-	else if (nr_tokens == 1) {
-		pid_t pid;
-		int status, result = 0;
-		//fork의 반환을 pid에 저장
-		pid = fork();
-		//fork의 반환값이 0이라면, 자식 프로세스임
-		if(pid == 0){
-			//execvp의 반환값을 result에 저장, result가 -1이면 실패
-			result = execvp(tokens[0], tokens);
-			//execvp가 실패하면 에러 반환 및 부모 프로세스로 돌아감
-			if (result == -1) {
-				exit(1);	
-			}
-			else {
-			// 성공하면 exit(0)으로 부모 프로세스에게 정보 반환
-				exit(0);
-			}
-		}	
-		//자식 프로세스가 끝날 때까지 부모 프로세스는 대기
-		wait(&status);
-		//stauts가 0이면 성공, 아니면 실패
-		if(status == 0) {
-			return 1;
+	//fork의 반환을 pid에 저장
+	pid = fork();
+	//fork의 반환값이 0이라면, 자식 프로세스임
+	if(pid == 0){
+		//execvp의 반환값을 result에 저장, result가 -1이면 실패
+		result = execvp(tokens[0], tokens);
+		//execvp가 실패하면 에러 반환 및 부모 프로세스로 돌아감
+		if (result == -1) {
+			exit(1);	
 		}
 		else {
-			return -1;
+		// 성공하면 exit(0)으로 부모 프로세스에게 정보 반환
+			exit(0);
 		}
+	}	
+	//자식 프로세스가 끝날 때까지 부모 프로세스는 대기
+	wait(&status);
+	//stauts가 0이면 성공, 아니면 실패
+	if(status == 0) {
+		return 1;
+	}
+	else {
+		return -1;
 	}
 	return -1;
 }
