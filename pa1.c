@@ -49,7 +49,7 @@ int run_command(int nr_tokens, char *tokens[])
 	//파이프가 있는 경우, pipe_loc의 길이가 0이 아니면 파이프 존재
 	if(nr_pipes > 0) {
 		int idx = 0; // execvp에 넣어줄 변수
-		// 파일 디스크립터 생성 (파이프의 개수만큼 동적으로 생성해줌)
+		// 파일 디스크립터 생성 (파이프의 개수만큼 동적으로 생성해줌 -> 파이프가 여러개 일수도 있기 때문에)
 		int (*pipefd)[2] = malloc(2 * sizeof(int) * nr_pipes);
 		for (int i = 0; i < nr_pipes; i++) {
 			if(pipe(pipefd[i]) == -1) exit(1); // 파이프 반환값이 -1이면 실패!
@@ -71,10 +71,7 @@ int run_command(int nr_tokens, char *tokens[])
 				return 1; 
 			}
 			pid = fork(); // 포크해서 자식 프로세스를 만들고
-			if(pid > 0) {
-				waitpid(pid, &status, 0);
-			} 
-			else if (pid == 0) {
+			if (pid == 0) {
 				//파이프 input pipefd[0]이 input임
 				if (i > 0) {
 					dup2(pipefd[i-1][0], STDIN_FILENO);
@@ -84,7 +81,7 @@ int run_command(int nr_tokens, char *tokens[])
 					dup2(pipefd[i][1], STDOUT_FILENO);
 				}
 				//파이프 닫기
-				for (int j = 0; j < nr_pipes; j++) {
+				for (int j = 0; j < i; j++) {
 					close(pipefd[j][0]);
 					close(pipefd[j][1]);
 				}
@@ -92,7 +89,9 @@ int run_command(int nr_tokens, char *tokens[])
 				if (i < nr_tokens) {
 					tokens[pipe_loc[i]] = NULL;
 				}
-				fprintf(stdout, "My PID : %d tokens : %s", pid, tokens[idx]);
+				else {
+					tokens[nr_tokens] = NULL;
+				}
 				result = execvp(tokens[idx], &tokens[idx]);
 				//execvp 반환값으로 성공여부 체크
 				if (result == -1) {
@@ -102,12 +101,17 @@ int run_command(int nr_tokens, char *tokens[])
 					exit(0);
 				}				
 			}
-			fprintf(stdout, "pid : %d\t token[%d] : %s\n", pid, idx, *(tokens + idx));
 			// 파이프 다음이 실행되기 때문에 idx는 토큰의 위치에서 +1
 			idx = pipe_loc[i] + 1;
 		}
-		// 메모리 할당
-		fprintf(stdout, "PROCESS NUM : %d\n", pid);
+		// 부모 프로세스 파일 디스크립터 닫기
+		for (int i = 0; i < nr_pipes; i++) {
+			close(pipefd[i][0]);
+			close(pipefd[i][1]);
+		}
+		// 자식 프로세스가 끝날 때까지 부모 프로세스는 대기
+		while (wait(&status) > 0);
+		// 메모리 할당 해제
 		free(pipe_loc);
 		free(pipefd);
 		if(status == 0) {
