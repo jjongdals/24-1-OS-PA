@@ -12,6 +12,9 @@
  * GNU General Public License for more details.
  *
  **********************************************************************/
+typedef unsigned char bool;
+#define true	1
+#define false	0
 
 #include <stdio.h>
 #include <string.h>
@@ -31,7 +34,8 @@ typedef struct alias {
 } alias_entry;
 //stack 자료구조로 alias 사용
 LIST_HEAD(stack);
-
+//
+int alias_cnt = 0;
 /***********************************************************************
  * run_command()
  *
@@ -60,7 +64,9 @@ int run_command(int nr_tokens, char *tokens[])
 				if(strcmp(tokens[i], pos->name) == 0) {
 					//execute command는 alias의 명령어임 name 같은 걸 이걸로 대체
 					char *execute_command = malloc(strlen(pos->command) + 1);
+					//command를 execute_command로 복사 -> xyz hello world면 execute command를 token[i]에 넣기
 					strcpy(execute_command, pos->command);
+
 				}
 			}
 		}
@@ -146,17 +152,43 @@ int run_command(int nr_tokens, char *tokens[])
 				return -1; 
 			}
 			return 1; 
-		}
+		} 
 		//alias 일 경우 내부 명령어기 때문에 fork 할 필요는 없음
 		if (strcmp(tokens[0], "alias") == 0) {
-			alias_entry * alias_list;
-			// alias에 저장된 명령어를 출력할 때readme에는 역순으로 출력함 따라서 reverse로 접근
-			list_for_each_entry_reverse(alias_list, &stack, list) {
-				fprintf(stderr, "%s: %s\n", alias_list->name, alias_list->command);
-			}
 			//alias 명령어를 추가하는 케이스도 생각해야 함 -> 이 때는 nr_tokens가 2개 이상임
 			if (nr_tokens > 1) {
-				// 이건 일단 내일 생각하자 ㅠㅠ~
+				//input size는 토큰길이의 맥스값이랑 토큰 개수의 맥스값을 곱해줌
+				int input_size = MAX_TOKEN_LEN * MAX_NR_TOKENS;
+				char *input_command = malloc(input_size);
+				// memset으로 문자열 뒤를 0으로 초기화해줌 -> strcpy나 strlen을 쓰기 위해서..
+				if (input_command != NULL) memset(input_command, 0, input_size);
+				alias_entry * add_alias = (alias_entry*)malloc(sizeof(alias_entry));
+				// alias xyz hello world가 들어올 땐 xyz 뒤의 hello world 전체가 들어옴 따라서 이걸 전부 다 고려 (공백도 두번 스페이스 되더라도 한개로 처리)
+				for (int i = 2; i < nr_tokens; i++) {
+					strcat(input_command, tokens[i]);
+					// input command에 공백도 고려해서 넘겨줌
+					if (i < nr_tokens - 1) {
+						strcat(input_command, " ");
+					}	
+				}
+				//command 문자열은 string으로 전달되기 때문에 동적할당으로 메모리할당을 해줘야함
+				add_alias->command = malloc(strlen(input_command)+1);
+				add_alias->name = malloc(strlen(tokens[1])+1);
+				//alias name에는 token[1]이 들어옴 
+				strcpy(add_alias->name, tokens[1]);
+				//alias command에는 input command가 들어옴
+				strcpy(add_alias->command, input_command);
+				//pa0처럼 stack에다 추가
+				list_add(&add_alias->list, &stack);
+				alias_cnt++; // alias count를 추가해준다
+			}
+			// alias 목록 리스트 출력할 케이스
+			else {
+				alias_entry *alias_list;
+				// alias에 저장된 명령어를 출력할 때 , readme에는 역순으로 출력함 따라서 reverse로 접근
+				list_for_each_entry_reverse(alias_list, &stack, list) {
+					fprintf(stderr, "%s: %s\n", alias_list->name, alias_list->command);
+				}
 			}
 			return 1;
 		}
