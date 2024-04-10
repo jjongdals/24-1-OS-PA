@@ -34,8 +34,7 @@ typedef struct alias {
 } alias_entry;
 //stack 자료구조로 alias 사용
 LIST_HEAD(stack);
-//
-int alias_cnt = 0;
+
 /***********************************************************************
  * run_command()
  *
@@ -53,8 +52,9 @@ int run_command(int nr_tokens, char *tokens[])
 	if (strcmp(tokens[0], "exit") == 0) return 0; // exit일 경우
 	pid_t pid;
 	int status, status2, result = 0;
+	char *alias_tokens[MAX_NR_TOKENS] = { NULL }; // parse_command에 넣기 위한 token
 	// alias가 있다면 alias 처리
-	if(alias_cnt > 0) {
+	if(!(list_empty(&stack))) {
 		alias_entry * pos;
 		//먼저 alias 순회
 		list_for_each_entry(pos, &stack, list) {
@@ -63,18 +63,22 @@ int run_command(int nr_tokens, char *tokens[])
 				//i번째 token이 alias로 지정한 이름과 같다면? 거기에 있는 command를 실행
 				if(strcmp(tokens[i], pos->name) == 0) {
 					//execute command는 alias의 명령어임 name 같은 걸 이걸로 대체
-					char *execute_command = malloc(strlen(pos->command) + 1);
-					//command를 execute_command로 복사 -> xyz hello world면 execute command를 token[i]에 넣기
-					strcpy(execute_command, pos->command);
-
+					char *execute_command = malloc(sizeof(pos->command) + 1);
+					//execute_command를 자름
+					int nr_commands = parse_command(execute_command, alias_tokens);
+					for (int j = 0; j < nr_commands; j++, i++) {
+                        tokens[i] = strdup(alias_tokens[j]); 
+                    }
+					for (int k = 0; k < nr_commands; k++) {
+                        free(alias_tokens[k]);
+                    }
+					break;
 				}
 			}
 		}
 	}
-
 	int nr_pipes = 0; //파이프의 갯수
-	//파이프의 위치를 저장하는 배열 생성, 동적으로 할당해줌, nr_tokens만큼 동적할당 해줌
-	int pipe_loc = 0;
+	int pipe_loc = 0; //파이프 위친
 	// pipe가 있는지 체크하고 파이프의 위치를 반환
 	for(int i = 0; i < nr_tokens; i++) {
 		if (strcmp(tokens[i], "|") == 0) {
@@ -104,22 +108,22 @@ int run_command(int nr_tokens, char *tokens[])
 		pid_t left_pid = fork();
 		// 부모 먼저 실행
 		if (left_pid != CHILD) {
-			waitpid(left_pid, &status, 0); // wait pid (that executes left command)
 			close(pipefd[STDOUT_FILENO]);
 			// 오른쪽 포크해줌
 			pid_t right_pid = fork();
-			// 부모 프로세스 실행
 			if (right_pid != CHILD) {
-				waitpid(right_pid, &status2, 0);
 				close(pipefd[STDIN_FILENO]);
+				waitpid(left_pid, &status, 0); // wait pid (that executes left command)
+				waitpid(right_pid, &status2, 0);
 			}
-			//오른쪽 자식 프로세스일 때
+			//오른쪽 자식 프로세스
 			else if (right_pid == CHILD) {
 				dup2(pipefd[STDIN_FILENO], STDIN_FILENO);
+				close(pipefd[STDOUT_FILENO]);
 				result = execvp(tokens[pipe_loc+1], &tokens[pipe_loc+1]);
-				close(pipefd[STDIN_FILENO]);
 				if (result == -1) {
 					fprintf(stderr, "Unable to execute %s\n", tokens[pipe_loc+1]);
+					close(pipefd[STDIN_FILENO]);
 					exit(1);
 				}
 				exit(0);
@@ -127,10 +131,11 @@ int run_command(int nr_tokens, char *tokens[])
 		}
 		else if (left_pid == CHILD){
 			dup2(pipefd[STDOUT_FILENO], STDOUT_FILENO);
+			close(pipefd[STDIN_FILENO]);
 			result = execvp(tokens[0], &tokens[0]);
-			close(pipefd[STDOUT_FILENO]);
 			if (result == -1) {
 				fprintf(stderr, "Unable to execute %s\n", tokens[0]);
+				close(pipefd[STDOUT_FILENO]);
 				exit(1);
 			}
 			exit(0);
@@ -180,7 +185,6 @@ int run_command(int nr_tokens, char *tokens[])
 				strcpy(add_alias->command, input_command);
 				//pa0처럼 stack에다 추가
 				list_add(&add_alias->list, &stack);
-				alias_cnt++; // alias count를 추가해준다
 			}
 			// alias 목록 리스트 출력할 케이스
 			else {
