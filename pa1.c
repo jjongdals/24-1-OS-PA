@@ -55,22 +55,23 @@ int run_command(int nr_tokens, char *tokens[])
 	char *alias_tokens[MAX_NR_TOKENS] = { NULL }; // alias token화시킬 문자열
 	// alias가 있다면 alias 처리
 	if(!(list_empty(&stack))) {
+		int i;
 		alias_entry * pos;
 		//먼저 alias 순회
 		list_for_each_entry(pos, &stack, list) {
 			// 일단 nr_tokens만큼 처리하고 여기서 alias로 대체된 문자열이 있다면 그걸 대신해서 실행
-			for (int i = 0; i < nr_tokens ; i++) {
+			for (i = 0; i < nr_tokens ; i++) {
 				//i번째 token이 alias로 지정한 이름과 같다면? 거기에 있는 command를 갖고옴
 				if(strcmp(tokens[i], pos->name) == 0) {
 					//execute command는 alias의 명령어임 name 같은 걸 이걸로 대체
-					char *execute_command = malloc(strlen(pos->command));
+					char *execute_command = malloc(strlen(pos->command)+1);
 					// execute command에 복사 (alias command를 ㅇㅇ)
 					strcpy(execute_command, pos->command);
 					//execute_command를 자르고 리턴값은 자른 갯수
 					int nr_alias_tokens = parse_command(execute_command, alias_tokens); 
 					int nr_change_tokens = nr_tokens + nr_alias_tokens - 1; // 원래 xyz는 사라지니까 1을 빼줌
 					//새로운 토큰을 넣어줌
-					char **new_tokens = (char**)malloc(sizeof(char *) * (nr_change_tokens));
+					char **new_tokens = (char**)malloc(sizeof(char *)*(nr_change_tokens));
 					int j;
 					//토큰 길이만큼 동적할당
 					for (j = 0; j < nr_change_tokens; j++) {
@@ -88,12 +89,15 @@ int run_command(int nr_tokens, char *tokens[])
                 	for (int k = i + 1; k < nr_tokens; j++, k++) {
                     	new_tokens[j] = strdup(tokens[k]);
                 	}
+					//token에 옮겨줘여하니까 동적할당 해줘야함
 					tokens = (char**)malloc(sizeof(char*)*nr_change_tokens);
 					tokens = new_tokens;
                 	nr_tokens = nr_change_tokens;
 				}
 			}
 		}
+		// execvp 실행을 위해 마지막 문자를 null로 해줘야함...
+		tokens[i] = NULL;
 	}
 	int nr_pipes = 0; //파이프의 갯수
 	int pipe_loc = 0; //파이프 위친
@@ -130,8 +134,10 @@ int run_command(int nr_tokens, char *tokens[])
 			// 오른쪽 포크해줌
 			pid_t right_pid = fork();
 			if (right_pid != CHILD) {
+				//닫아주고
 				close(pipefd[STDIN_FILENO]);
-				waitpid(left_pid, &status, 0); // wait pid (that executes left command)
+				//자식 프로세스들이 끝날때까지 대기
+				waitpid(left_pid, &status, 0); 
 				waitpid(right_pid, &status2, 0);
 			}
 			//오른쪽 자식 프로세스
@@ -139,6 +145,7 @@ int run_command(int nr_tokens, char *tokens[])
 				dup2(pipefd[STDIN_FILENO], STDIN_FILENO);
 				close(pipefd[STDOUT_FILENO]);
 				result = execvp(tokens[pipe_loc+1], &tokens[pipe_loc+1]);
+				//반환값이 잘못되면 오류 출력하고 에러 반환되게
 				if (result == -1) {
 					fprintf(stderr, "Unable to execute %s\n", tokens[pipe_loc+1]);
 					close(pipefd[STDIN_FILENO]);
@@ -147,6 +154,7 @@ int run_command(int nr_tokens, char *tokens[])
 				exit(0);
 			}
 		}
+		//왼쪽 자식 프로세스
 		else if (left_pid == CHILD){
 			dup2(pipefd[STDOUT_FILENO], STDOUT_FILENO);
 			close(pipefd[STDIN_FILENO]);
