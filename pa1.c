@@ -52,7 +52,7 @@ int run_command(int nr_tokens, char *tokens[])
 	if (strcmp(tokens[0], "exit") == 0) return 0; // exit일 경우
 	pid_t pid;
 	int status, status2, result = 0;
-	char *alias_tokens[MAX_NR_TOKENS] = { NULL }; // parse_command에 넣기 위한 token
+	char *alias_tokens[MAX_NR_TOKENS] = { NULL }; // alias token화시킬 문자열
 	// alias가 있다면 alias 처리
 	if(!(list_empty(&stack))) {
 		alias_entry * pos;
@@ -60,19 +60,37 @@ int run_command(int nr_tokens, char *tokens[])
 		list_for_each_entry(pos, &stack, list) {
 			// 일단 nr_tokens만큼 처리하고 여기서 alias로 대체된 문자열이 있다면 그걸 대신해서 실행
 			for (int i = 0; i < nr_tokens ; i++) {
-				//i번째 token이 alias로 지정한 이름과 같다면? 거기에 있는 command를 실행
+				//i번째 token이 alias로 지정한 이름과 같다면? 거기에 있는 command를 갖고옴
 				if(strcmp(tokens[i], pos->name) == 0) {
 					//execute command는 alias의 명령어임 name 같은 걸 이걸로 대체
-					char *execute_command = malloc(sizeof(pos->command) + 1);
-					//execute_command를 자름
-					int nr_commands = parse_command(execute_command, alias_tokens);
-					for (int j = 0; j < nr_commands; j++, i++) {
-                        tokens[i] = strdup(alias_tokens[j]); 
-                    }
-					for (int k = 0; k < nr_commands; k++) {
-                        free(alias_tokens[k]);
-                    }
-					break;
+					char *execute_command = malloc(strlen(pos->command));
+					// execute command에 복사 (alias command를 ㅇㅇ)
+					strcpy(execute_command, pos->command);
+					//execute_command를 자르고 리턴값은 자른 갯수
+					int nr_alias_tokens = parse_command(execute_command, alias_tokens); 
+					int nr_change_tokens = nr_tokens + nr_alias_tokens - 1; // 원래 xyz는 사라지니까 1을 빼줌
+					//새로운 토큰을 넣어줌
+					char **new_tokens = (char**)malloc(sizeof(char *) * (nr_change_tokens));
+					int j;
+					//토큰 길이만큼 동적할당
+					for (j = 0; j < nr_change_tokens; j++) {
+						new_tokens[j] = malloc(MAX_TOKEN_LEN);
+					}
+					//alias 전까진 기존 tokens 유지
+					for (j = 0; j < i; j++) {
+                    	new_tokens[j] = strdup(tokens[j]);
+                	}
+					//new_tokens에 alias 자른 문자열 넣기
+        	        for (int k = 0; k < nr_alias_tokens; j++, k++) {
+            	        new_tokens[j] = strdup(alias_tokens[k]);
+                	}
+					//new_tokens에 기존에 다른 tokens 넣기
+                	for (int k = i + 1; k < nr_tokens; j++, k++) {
+                    	new_tokens[j] = strdup(tokens[k]);
+                	}
+					tokens = (char**)malloc(sizeof(char*)*nr_change_tokens);
+					tokens = new_tokens;
+                	nr_tokens = nr_change_tokens;
 				}
 			}
 		}
