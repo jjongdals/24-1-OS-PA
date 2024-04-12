@@ -129,6 +129,12 @@ Let's build my amazing shell with those system calls.
   Hello world Korea   # 'world' is translated from xyz so it is not translated again to Korea
   ```
 
+<<<<<<< HEAD
+=======
+- (Added 3/29 3pm) Don't worry about alias redefining, PASS would not check the case.
+
+
+>>>>>>> upstream/main
 - Hint
   - If `tokens[]` were a list of words, you might be able to implement the feature easily by replacing a word with multiple words.
   - Take care of the string in `tokens[]` which are allocated and deallocated in the functions in `parser.c`. It is advised to have a look at them before fiddling with `tokens[]`.
@@ -150,6 +156,11 @@ Let's build my amazing shell with those system calls.
 
 - You may assume that bulit-in commands are not used when using the pipe; only external commands will be used for using the pipe in this PA.
 
+<<<<<<< HEAD
+=======
+- (Added 4/2 9pm) Use the newly included `pipe` toy to test whether your implementation handles pipe properly or not.
+
+>>>>>>> upstream/main
 - Hints
   - `pipe(2)` and `dup2(2)`.
   - Implement incrementally. First check whether the pipe symbol exists in the tokens. If not, just do execute the command. If exists, split the tokens into two pars and feed them to **two** different processes which are connected through a pipe.
@@ -163,6 +174,10 @@ Let's build my amazing shell with those system calls.
 - DO NOT DO FOLLOWINGS. You will get 0 pts if you don't follow the instructions.
   - Do not use `system()` system call.
   - Do not implement external programs' features by yourself (e.g., printing out a message to handle `echo` command, listing the current directory to handle `ls` command, etc).
+<<<<<<< HEAD
+=======
+  - Do not make files to implement the pipe feature. Also, it is not valid to use a temporary buffer to convey the output of the first process to next one.
+>>>>>>> upstream/main
 - It is advised to test your code on your computer first and to implement incrementally. Some sample inputs are included under `testcases` directory. Try to input each line or just run `./mash < [input file]`.
 - FYI, the instructor's implementation took ~250 lines of C code. Believe me, the implementation is not difficult if you fully understand the concepts of processes.
 
@@ -199,4 +214,7 @@ Let's build my amazing shell with those system calls.
 
 - **YOU MIGHT NOT GET AN ANSWER IF THE ISSUE/TOPIC IS ALREADY DISCUSSED ON THIS HANDOUT**.
 - **QUESTIONS OVER EMAIL WILL BE IGNORED unless it concerns your privacy**.
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main

@@ -17,6 +17,10 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <getopt.h>
+<<<<<<< HEAD
+=======
+#include <errno.h>
+>>>>>>> upstream/main
 
 #include "parser.h"
 
@@ -83,7 +87,11 @@ int main(int argc, char * const argv[])
 
 		free_command_tokens(tokens);
 
+<<<<<<< HEAD
 		if (ret == 0) break;
+=======
+		if (ret == 0 || ret == -EINVAL) break;
+>>>>>>> upstream/main
 	}
 
 	finalize(argc, argv);

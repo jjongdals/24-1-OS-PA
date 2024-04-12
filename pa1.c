@@ -12,6 +12,7 @@
  * GNU General Public License for more details.
  *
  **********************************************************************/
+<<<<<<< HEAD
 typedef unsigned char bool;
 #define true	1
 #define false	0
@@ -34,6 +35,11 @@ typedef struct alias {
 } alias_entry;
 //stack 자료구조로 alias 사용
 LIST_HEAD(stack);
+=======
+
+#include <stdio.h>
+#include <string.h>
+>>>>>>> upstream/main
 
 /***********************************************************************
  * run_command()
@@ -49,6 +55,7 @@ LIST_HEAD(stack);
  */
 int run_command(int nr_tokens, char *tokens[])
 {
+<<<<<<< HEAD
 	if (strcmp(tokens[0], "exit") == 0) return 0; // exit일 경우
 	pid_t pid;
 	int status, status2, result = 0;
@@ -249,6 +256,14 @@ int run_command(int nr_tokens, char *tokens[])
 	}	
 	return -1;
 }
+=======
+	if (strcmp(tokens[0], "exit") == 0) return 0;
+
+	return -1;
+}
+
+
+>>>>>>> upstream/main
 /***********************************************************************
  * initialize()
  *
