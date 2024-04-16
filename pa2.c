@@ -118,6 +118,7 @@ static void fcfs_release(int resource_id)
 		 */
 		list_del_init(&waiter->list);
 
+
 		/* Update the process status */
 		waiter->status = PROCESS_READY;
 
