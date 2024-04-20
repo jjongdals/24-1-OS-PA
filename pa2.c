@@ -206,17 +206,60 @@ static struct process *sjf_schedule(void)
 	/**
 	 * Implement your own SJF scheduler here.
 	 */
-	return NULL;
+	struct process *next = NULL;
+	struct process *pos;
+
+	// 
+	if(!current || current->status == PROCESS_BLOCKED) {
+		goto pick_next;
+	}
+
+	// lifespan이랑 age가 같으면 안됨!
+	if(current->age < current->lifespan) {
+		return current;
+	}
+
+pick_next:
+	if(!list_empty(&readyqueue)) {
+		list_for_each_entry (pos, &readyqueue, list) {
+			if(!next || pos->lifespan < next->lifespan) {
+				next = pos;
+			}
+		}
+		list_del_init(&next->list);
+	}
+
+	return next;
 }
 
 struct scheduler sjf_scheduler = {
 	.name = "Shortest-Job First",
 	.acquire = fcfs_acquire,	/* Use the default FCFS acquire() */
 	.release = fcfs_release,	/* Use the default FCFS release() */
-	.schedule = NULL,			/* TODO: Assign your schedule function  
+	.schedule = sjf_schedule,			/* TODO: Assign your schedule function  
 								   to this function pointer to activate
 								   SJF in the simulation system */
 };
+
+/***********************************************************************
+ * STCF scheduler
+ ***********************************************************************/
+static struct process *stcf_schedule() {
+	
+	if(!current || current->status == PROCESS_BLOCKED) {
+		goto pick_next;
+	}
+
+	if(current->age < current->lifespan) {
+		return current;
+	}
+pick_next:
+	if(!list_empty(&readyqueue)) {
+		// 새로운 프로세스가 올 때마다, 프로세스가 안돌때, task가 완료됐을 때 스케줄링을 고려
+	}
+
+
+}
 
 /***********************************************************************
  * STCF scheduler
@@ -225,7 +268,6 @@ struct scheduler stcf_scheduler = {
 	.name = "Shortest Time-to-Complete First",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
-
 	/* You need to check the newly created processes to implement STCF.
 	 * Have a look at @forked() callback.
 	 */
