@@ -207,22 +207,21 @@ static struct process *sjf_schedule(void)
 	 * Implement your own SJF scheduler here.
 	 */
 	struct process *next = NULL;
-	struct process *pos;
+	struct process *pos = NULL;
 
-	// 
 	if(!current || current->status == PROCESS_BLOCKED) {
 		goto pick_next;
 	}
 
-	// lifespan이랑 age가 같으면 안됨!
 	if(current->age < current->lifespan) {
 		return current;
 	}
 
 pick_next:
 	if(!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue, struct process, list);
 		list_for_each_entry (pos, &readyqueue, list) {
-			if(!next || pos->lifespan < next->lifespan) {
+			if(pos->lifespan < next->lifespan) {
 				next = pos;
 			}
 		}
@@ -245,20 +244,31 @@ struct scheduler sjf_scheduler = {
  * STCF scheduler
  ***********************************************************************/
 static struct process *stcf_schedule() {
-	
+
+	struct process *next = NULL;
+	struct process *pos = NULL;
+
 	if(!current || current->status == PROCESS_BLOCKED) {
 		goto pick_next;
 	}
-
+	//age랑 lifespan이랑 안 같으면 계속 실행하니까, preemptive한 특성 추가
 	if(current->age < current->lifespan) {
-		return current;
+		list_add_tail(&current->list, &readyqueue);
 	}
+	
 pick_next:
 	if(!list_empty(&readyqueue)) {
-		// 새로운 프로세스가 올 때마다, 프로세스가 안돌때, task가 완료됐을 때 스케줄링을 고려
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry(pos, &readyqueue, list) {
+			unsigned int remain_lifespan = pos->lifespan - pos->age;
+			unsigned int next_lifespan = next->lifespan - next->age;
+			if(remain_lifespan < next_lifespan) {
+				next = pos;
+			}
+		}
+		list_del_init(&next->list);
 	}
-
-
+	return next;
 }
 
 /***********************************************************************
@@ -271,10 +281,35 @@ struct scheduler stcf_scheduler = {
 	/* You need to check the newly created processes to implement STCF.
 	 * Have a look at @forked() callback.
 	 */
+	.schedule = stcf_schedule,
 
 	/* Obviously, you should implement stcf_schedule() and attach it here */
 };
 
+/***********************************************************************
+ * round robin schedule
+ ***********************************************************************/
+static struct process *rr_schedule() {
+
+	struct process *next = NULL;
+
+	if(!current || current->status == PROCESS_BLOCKED) {
+		goto pick_next;
+	}
+
+	if(current->age < current->lifespan) {
+		list_add_tail(&current->list, &readyqueue);
+	}
+	
+pick_next:
+	if(!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_del_init(&next->list);
+	}
+
+	return next;
+
+}
 /***********************************************************************
  * Round-robin scheduler
  ***********************************************************************/
@@ -282,30 +317,133 @@ struct scheduler rr_scheduler = {
 	.name = "Round-Robin",
 	.acquire = fcfs_acquire, /* Use the default FCFS acquire() */
 	.release = fcfs_release, /* Use the default FCFS release() */
-
+	.schedule = rr_schedule, // rr_schedule use
 	/* Obviously, ... */
 };
+
+static void prio_release(int resource_id)
+{
+	struct resource *r = resources + resource_id;
+
+	/* Ensure that the owner process is releasing the resource */
+	assert(r->owner == current);
+
+	/* Un-own this resource */
+	r->owner = NULL;
+
+	/* Let's wake up ONE waiter (if exists) that came first */
+	if (!list_empty(&r->waitqueue)) {
+		struct process *waiter = list_first_entry(&r->waitqueue, struct process, list);
+		struct process *pos = NULL;
+		/**
+		 * Ensure the waiter is in the wait status
+		 */
+		assert(waiter->status == PROCESS_BLOCKED);
+
+		list_for_each_entry(pos, &r->waitqueue, list) {
+			if(waiter->prio < pos->prio) {
+				waiter = pos;
+			}
+		}
+
+		/**
+		 * Take out the waiter from the waiting queue. Note we use
+		 * list_del_init() over list_del() to maintain the list head tidy
+		 * (otherwise, the framework will complain on the list head
+		 * when the process exits).
+		 */
+		list_del_init(&waiter->list);
+
+
+		/* Update the process status */
+		waiter->status = PROCESS_READY;
+
+		/**
+		 * Put the waiter process into ready queue. The framework will
+		 * do the rest.
+		 */
+		list_add_tail(&waiter->list, &readyqueue);
+	}
+}
+
+/***********************************************************************
+ * priority schedule
+ ***********************************************************************/
+static struct process *prio_schedule() {
+
+	struct process *next = NULL;
+	struct process *pos = NULL;
+
+	if(!current || current->status == PROCESS_BLOCKED) {
+		goto pick_next;
+	}
+
+	if(current->age < current->lifespan) {
+		return current;
+	}
+	
+pick_next:
+	if(!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry(pos, &readyqueue, list) {
+			if(next->prio < pos->prio) {
+				next = pos;
+			}
+		}
+		list_del_init(&next->list);
+	}
+	return next;
+
+}
 
 /***********************************************************************
  * Priority scheduler
  ***********************************************************************/
 struct scheduler prio_scheduler = {
 	.name = "Priority",
-	/**
-	 * Implement your own acqure/release function to make the priority
-	 * scheduler correct.
-	 */
-	/* Implement your own prio_schedule() and attach it here */
+	.acquire = fcfs_acquire,
+	.release = prio_release,
+	.schedule = prio_schedule,
 };
+
+/***********************************************************************
+ * priority + aging schedule
+ ***********************************************************************/
+static struct process *pa_schedule() {
+
+	struct process *next = NULL;
+	struct process *pos = NULL;
+
+	if(!current || current->status == PROCESS_BLOCKED) {
+		goto pick_next;
+	}
+
+	if(current->age < current->lifespan) {
+		return current;
+	}
+	
+pick_next:
+	if(!list_empty(&readyqueue)) {
+		next = list_first_entry(&readyqueue, struct process, list);
+		list_for_each_entry(pos, &readyqueue, list) {
+			if(next->prio < pos->prio) {
+				next = pos;
+			}
+		}
+		list_del_init(&next->list);
+	}
+	return next;
+
+}
 
 /***********************************************************************
  * Priority scheduler with aging
  ***********************************************************************/
 struct scheduler pa_scheduler = {
 	.name = "Priority + aging",
-	/**
-	 * Ditto
-	 */
+	.acquire = fcfs_acquire,
+	.release = prio_release,
+	.schedule = pa_schedule,
 };
 
 /***********************************************************************
