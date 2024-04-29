@@ -220,7 +220,7 @@ static struct process *sjf_schedule(void)
 pick_next:
 	if(!list_empty(&readyqueue)) {
 		next = list_first_entry(&readyqueue, struct process, list);
-		list_for_each_entry (pos, &readyqueue, list) {
+		list_for_each_entry(pos, &readyqueue, list) {
 			if(pos->lifespan < next->lifespan) {
 				next = pos;
 			}
@@ -429,9 +429,12 @@ pick_next:
 			if(next->prio < pos->prio) {
 				next = pos;
 			}
+			pos->prio++;
 		}
+		next->prio = next->prio_orig;
 		list_del_init(&next->list);
 	}
+	dump_status();
 	return next;
 
 }
@@ -446,14 +449,86 @@ struct scheduler pa_scheduler = {
 	.schedule = pa_schedule,
 };
 
+static bool pcp_acquire(int resource_id)
+{
+	struct resource *r = resources + resource_id;
+
+	if (!r->owner) {
+		/* This resource is not owned by any one. Take it! */
+		r->owner = current;
+		r->owner->prio = MAX_PRIO;
+		return true;
+	}
+
+	/* OK, this resource is taken by @r->owner. */
+
+	/* Update the current process state */
+	current->status = PROCESS_BLOCKED;
+
+	/* And append current to waitqueue */
+	list_add_tail(&current->list, &r->waitqueue);
+
+	/**
+	 * And return false to indicate the resource is not available.
+	 * The scheduler framework will soon call schedule() function to
+	 * schedule out current and to pick the next process to run.
+	 */
+	return false;
+}
+
+static void pcp_release(int resource_id)
+{
+	struct resource *r = resources + resource_id;
+
+	/* Ensure that the owner process is releasing the resource */
+	assert(r->owner == current);
+
+	/* Un-own this resource */
+	r->owner = NULL;
+
+	/* Let's wake up ONE waiter (if exists) that came first */
+	if (!list_empty(&r->waitqueue)) {
+		struct process *waiter = list_first_entry(&r->waitqueue, struct process, list);
+		struct process *pos = NULL;
+		/**
+		 * Ensure the waiter is in the wait status
+		 */
+		assert(waiter->status == PROCESS_BLOCKED);
+
+		list_for_each_entry(pos, &r->waitqueue, list) {
+			if(waiter->prio < pos->prio) {
+				waiter = pos;
+			}
+		}
+
+		/**
+		 * Take out the waiter from the waiting queue. Note we use
+		 * list_del_init() over list_del() to maintain the list head tidy
+		 * (otherwise, the framework will complain on the list head
+		 * when the process exits).
+		 */
+		list_del_init(&waiter->list);
+
+
+		/* Update the process status */
+		waiter->status = PROCESS_READY;
+
+		/**
+		 * Put the waiter process into ready queue. The framework will
+		 * do the rest.
+		 */
+		list_add_tail(&waiter->list, &readyqueue);
+	}
+}
+
 /***********************************************************************
  * Priority scheduler with priority ceiling protocol
  ***********************************************************************/
 struct scheduler pcp_scheduler = {
 	.name = "Priority + PCP Protocol",
-	/**
-	 * Ditto
-	 */
+	.release = pcp_release,
+	.acquire = pcp_acquire,
+	.schedule = prio_schedule,
 };
 
 /***********************************************************************
@@ -461,7 +536,5 @@ struct scheduler pcp_scheduler = {
  ***********************************************************************/
 struct scheduler pip_scheduler = {
 	.name = "Priority + PIP Protocol",
-	/**
-	 * Ditto
-	 */
+	.schedule = prio_schedule,
 };
