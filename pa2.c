@@ -260,7 +260,7 @@ pick_next:
 	if(!list_empty(&readyqueue)) {
 		next = list_first_entry(&readyqueue, struct process, list);
 		list_for_each_entry(pos, &readyqueue, list) {
-			// life span 남은 건 계속 계산 해줘야 함
+			// life span 남은 건 계속 계산 해줘야 함 (age에서 빼줘야 함 남은 life span 계산이니)
 			unsigned int remain_lifespan = pos->lifespan - pos->age;
 			unsigned int next_lifespan = next->lifespan - next->age;
 			if(remain_lifespan < next_lifespan) {
@@ -283,8 +283,6 @@ struct scheduler stcf_scheduler = {
 	 * Have a look at @forked() callback.
 	 */
 	.schedule = stcf_schedule,
-
-	/* Obviously, you should implement stcf_schedule() and attach it here */
 };
 
 /***********************************************************************
@@ -426,6 +424,7 @@ pick_next:
 	if(!list_empty(&readyqueue)) {
 		next = list_first_entry(&readyqueue, struct process, list);
 		list_for_each_entry(pos, &readyqueue, list) {
+			// test case에서 같다고 안하면 틀림 왜지?
 			if(next->prio <= pos->prio) {
 				next = pos;
 			}
@@ -434,9 +433,8 @@ pick_next:
 		next->prio = next->prio_orig;
 		list_del_init(&next->list);
 	}
-	//dump_status();
-	return next;
 
+	return next;
 }
 
 /***********************************************************************
@@ -456,7 +454,7 @@ static bool pcp_acquire(int resource_id)
 	if (!r->owner) {
 		/* This resource is not owned by any one. Take it! */
 		r->owner = current;
-		// 지금 리소스를 쓰고 있는 애를 max prio로 설정
+		// 지금 리소스를 쓰고 있는 애를 max prio로 설정 말곤 다른 추가할 건 없음
 		r->owner->prio = MAX_PRIO;
 		return true;
 	}
@@ -483,7 +481,7 @@ static void pcp_release(int resource_id)
 
 	/* Ensure that the owner process is releasing the resource */
 	assert(r->owner == current);
-
+	//prio 복구
 	r->owner->prio = r->owner->prio_orig;
 	/* Un-own this resource */
 	r->owner = NULL;
@@ -530,8 +528,9 @@ struct scheduler pcp_scheduler = {
 	.name = "Priority + PCP Protocol",
 	.release = pcp_release,
 	.acquire = pcp_acquire,
-	.schedule = prio_schedule,
+	.schedule = prio_schedule, // 스케줄링은 우선순위로 해주면 됨
 };
+
 static bool pip_acquire(int resource_id)
 {
 	struct resource *r = resources + resource_id;
@@ -569,6 +568,7 @@ static void pip_release(int resource_id)
 	/* Ensure that the owner process is releasing the resource */
 	assert(r->owner == current);
 
+	//prio 복구
 	r->owner->prio = r->owner->prio_orig;
 	/* Un-own this resource */
 	r->owner = NULL;
@@ -614,5 +614,5 @@ struct scheduler pip_scheduler = {
 	.name = "Priority + PIP Protocol",
 	.release = pip_release,
 	.acquire = pip_acquire,
-	.schedule = prio_schedule,
+	.schedule = prio_schedule, // 스케줄링은 그냥 우선순위로 해주면 됨
 };
