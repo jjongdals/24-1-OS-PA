@@ -260,6 +260,7 @@ pick_next:
 	if(!list_empty(&readyqueue)) {
 		next = list_first_entry(&readyqueue, struct process, list);
 		list_for_each_entry(pos, &readyqueue, list) {
+			// life span 남은 건 계속 계산 해줘야 함
 			unsigned int remain_lifespan = pos->lifespan - pos->age;
 			unsigned int next_lifespan = next->lifespan - next->age;
 			if(remain_lifespan < next_lifespan) {
@@ -428,7 +429,7 @@ pick_next:
 			if(next->prio <= pos->prio) {
 				next = pos;
 			}
-			++pos->prio;
+			pos->prio++;
 		}
 		next->prio = next->prio_orig;
 		list_del_init(&next->list);
@@ -455,6 +456,7 @@ static bool pcp_acquire(int resource_id)
 	if (!r->owner) {
 		/* This resource is not owned by any one. Take it! */
 		r->owner = current;
+		// 지금 리소스를 쓰고 있는 애를 max prio로 설정
 		r->owner->prio = MAX_PRIO;
 		return true;
 	}
@@ -482,6 +484,7 @@ static void pcp_release(int resource_id)
 	/* Ensure that the owner process is releasing the resource */
 	assert(r->owner == current);
 
+	r->owner->prio = r->owner->prio_orig;
 	/* Un-own this resource */
 	r->owner = NULL;
 
@@ -538,7 +541,7 @@ static bool pip_acquire(int resource_id)
 		r->owner = current;
 		return true;
 	}
-
+	// prio를 젤 높은 애로 줘야 하니까 이거로
 	if(r->owner->prio < current->prio) {
 		r->owner->prio = current->prio;
 	}
@@ -566,6 +569,7 @@ static void pip_release(int resource_id)
 	/* Ensure that the owner process is releasing the resource */
 	assert(r->owner == current);
 
+	r->owner->prio = r->owner->prio_orig;
 	/* Un-own this resource */
 	r->owner = NULL;
 
