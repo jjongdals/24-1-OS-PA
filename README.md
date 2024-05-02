@@ -122,7 +122,7 @@ We have learned various process scheduling policies and examined their propertie
 - Git repository (20 pts)
   - Register http URL and with a deploy token and password.
   - Start the repository by cloning this repository.
-  - Make sure the token is valid through May 4 (due + 3 slip days + 1 extra day)
+  - Make sure the token is valid through May 8 (due + 3 slip days + 1 extra day)
 
 - *WILL NOT ANSWER THE QUESTIONS ABOUT THOSE ALREADY SPECIFIED ON THE HANDOUT.*
 - *QUESTIONS OVER EMAIL WILL BE IGNORED UNLESS IT CONCERNS YOUR PRIVACY.*
