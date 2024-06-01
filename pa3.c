@@ -102,6 +102,7 @@ void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn)
  */
 unsigned int alloc_page(unsigned int vpn, unsigned int rw)
 {
+	
 	return -1;
 }
 
