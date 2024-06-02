@@ -102,7 +102,35 @@ void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn)
  */
 unsigned int alloc_page(unsigned int vpn, unsigned int rw)
 {
-	
+	unsigned int pfn = 0; // page frame number
+	unsigned int pd_idx = vpn / NR_PTES_PER_PAGE; // page directory's index 
+	unsigned int pte_idx = vpn % NR_PTES_PER_PAGE; // smallest pfn index 
+
+	// physical memory 검사
+	for (int i = 0; i < NR_PAGEFRAMES; i++, pfn++) {
+		// 다른 process에 의해 mapping 됐는지 체크
+		if(mapcounts[i] == 0) {
+			mapcounts[i]++; // pte랑 mapping됨
+
+			struct pte_directory *pte_dir = current->pagetable.pdes[pd_idx]; //pte_dir
+			// allocate check
+			if(pte_dir == NULL) {
+				pte_dir = malloc(sizeof(struct pte_directory));
+				current->pagetable.pdes[pd_idx] = pte_dir;
+			}
+			// pte => 이건 pte_dir 하위임
+			struct pte *pte = &pte_dir->ptes[pte_idx];
+			// set page table entry's value
+			pte->valid = true;
+			pte->rw = rw; 
+			pte->private = rw; 
+			pte->pfn = pfn;
+			
+			return pfn;
+		}
+
+	}
+
 	return -1;
 }
 
