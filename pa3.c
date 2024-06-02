@@ -125,7 +125,7 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw)
 			pte->rw = rw; 
 			pte->private = rw; 
 			pte->pfn = pfn;
-			
+
 			return pfn;
 		}
 
@@ -146,6 +146,14 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw)
  */
 void free_page(unsigned int vpn)
 {
+	// 일단 pd_idx, pte_idx는 정의 해놓고
+	unsigned int pd_idx = vpn / NR_PTES_PER_PAGE;
+	unsigned int pte_idx = vpn % NR_PTES_PER_PAGE;
+	// tlb를 써야하는데 이건 파일 맨 위에 정의 되어 있음
+	
+		
+
+
 }
 
 
