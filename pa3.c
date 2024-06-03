@@ -146,16 +146,42 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw)
  */
 void free_page(unsigned int vpn)
 {
-	// 일단 pd_idx, pte_idx는 정의 해놓고
+	// pd_idx, pte_idx -> alloc 기능에서 정의한 것 처럼, map_cnt는 
 	unsigned int pd_idx = vpn / NR_PTES_PER_PAGE;
 	unsigned int pte_idx = vpn % NR_PTES_PER_PAGE;
-	// tlb를 써야하는데 이건 파일 맨 위에 정의 되어 있음
+	int map_cnt = 0;
 	
-		
+	struct pte_directory *pte_dir = current->pagetable.pdes[pd_idx];
+	struct pte *pte = &current->pagetable.pdes[pd_idx]->ptes[pte_idx]; // pte 
 
-
+	// if pte_dir is allocated, exist pte in pte_dir
+	if (pte_dir != NULL) {
+		// pte's valid check
+		if(pte->valid == true) {
+			// deallocate
+			pte->valid = false;
+			pte->rw = 0;
+			pte->private = 0;
+			//mapcount save
+			map_cnt = pte->pfn;
+			pte->pfn = 0;
+			// count down input vpn's map count
+			mapcounts[map_cnt]--;
+			
+			// tlb도 없애주자 tlb는 cache니까 free를 해주면 같이 없애줘야 함
+			for (int i = 0; i < NR_TLB_ENTRIES; i++) {
+				if ((tlb[i].valid == true) && (tlb[i].vpn == vpn)) {
+					tlb[i].valid = false;
+					tlb[i].vpn = 0;
+					tlb[i].private = 0;
+					tlb[i].pfn = 0;
+					tlb[i].rw = 0;
+					break;
+				}	
+			}
+		}
+	}
 }
-
 
 /**
  * handle_page_fault()
@@ -199,5 +225,40 @@ bool handle_page_fault(unsigned int vpn, unsigned int rw)
  */
 void switch_process(unsigned int pid)
 {
+	struct process *change;
+
+	// processes linked list isn't empty!
+	if(!list_empty(&processes)) {
+		// process linked list 순회
+		list_for_each_entry(change, &processes, list) {
+			// if first process exist in process's linkded list
+			if(change->pid == pid) {
+				list_add_tail(&current->list, &processes);
+				current = change; // current process는 pid가 같은 다른 process로 변경
+				ptbr = &current->pagetable; // ptbr은 current pagetable의 address니까 change
+				list_del(&change->list);
+				break; // if process change => loop exit
+			}
+		}
+	}
+	// process isn't in processes => fork process
+	change = malloc(sizeof(struct process));
+	INIT_LIST_HEAD(&change->list);
+	change->pid = pid;
+
+	for (int i = 0; i < NR_PDES_PER_PAGE; i++) {
+	 	for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
+	 		struct pte *current_pte = current->pagetable.pdes[i];
+	 		struct pte *change_pte = change->pagetable.pdes[i];
+
+			if(current_pte->valid == true) {
+				
+				change_pte->pfn = current_pte->pfn;
+	 		}
+	 	}
+	}
+	ptbr = &change->pagetable;
+	list_add(&current->list, &processes);
+
 }
 
