@@ -115,10 +115,10 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw)
 
 			struct pte_directory *pte_dir = current->pagetable.pdes[pd_idx]; //pte_dir
 			// allocate check
-			// if(pte_dir == NULL) {
-			// 	pte_dir = malloc(sizeof(struct pte_directory));
-			// 	current->pagetable.pdes[pd_idx] = pte_dir;
-			// }
+			if(pte_dir == NULL) {
+				pte_dir = malloc(sizeof(struct pte_directory));
+				current->pagetable.pdes[pd_idx] = pte_dir;
+			}
 			// pte => 이건 pte_dir 하위임
 			struct pte *pte = &pte_dir->ptes[pte_idx];
 			// set page table entry's value
@@ -228,12 +228,11 @@ void switch_process(unsigned int pid)
 {	
 	struct process *change;
 	bool is_change = false;
-
 	// process linked list 순회
 	list_for_each_entry(change, &processes, list) {
 		// if first process exist in process's linkded list
 		if(change->pid == pid) {
-			list_add_tail(&current->list, &processes);
+			//list_add_tail(&current->list, &processes);
 			current = change; // current process는 pid가 같은 다른 process로 변경
 			ptbr = &current->pagetable; // ptbr은 current pagetable의 address니까 change
 			list_del_init(&change->list);
@@ -248,36 +247,40 @@ void switch_process(unsigned int pid)
 		change->pid = pid;
 
 		// pte_directory 만큼 반복문 벅벅 why? physical 메모리에 매핑 해야 함
-		for (int i = 0; i < NR_PDES_PER_PAGE; i++) {
+		for (int i = 0; i < NR_PDES_PER_PAGE; i++) {			
 			// 이건 pte_dir 주소값 이걸로 첫번째 테이블 녀석 주소값 갖고오자 (0-3)
-			struct pte_directory *pte_dir = malloc(sizeof(struct pte_directory));
+			struct pte_directory *pte_dir;
+			struct pte_directory *temp = malloc(sizeof(struct pte_directory));
 			pte_dir = current->pagetable.pdes[i];
 			// pte_dir가 안 비어있을 때만 계속 진행
-			if(!pte_dir) continue;
-			// 테이블 디렉토리 밑에 있는 애들 16번 씩 돌아서 pte 갖고오게
-			for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
-				struct pte *current_pte = &pte_dir->ptes[j];
-				struct pte *change_pte = malloc(sizeof(struct pte));
-				// valid bit가 true일 때만
-				if(current_pte->valid == true) {
-					//원래 값이랑 바꿀 값이랑 복사해주고
-					memcpy(change_pte, current_pte, sizeof(struct pte));
-					mapcounts[current_pte->pfn]++; // physical mem 에 mapping 
-					change_pte->pfn = current_pte->pfn; // pfn도 추가
+			if(pte_dir != NULL) {
+				change->pagetable.pdes[i] = temp;
+				// 테이블 디렉토리 밑에 있는 애들 16번 씩 돌아서 pte 갖고오게
+				for (int j = 0; j < NR_PTES_PER_PAGE; j++) {
+					struct pte *change_pte = &change->pagetable.pdes[i]->ptes[j];
+					struct pte *current_pte = &pte_dir->ptes[j]; 
+					// valid bit가 true일 때만
+					if(current_pte->valid == true) {
+						//원래 값이랑 바꿀 값이랑 복사해주고
+						memcpy(change_pte, current_pte, sizeof(struct pte));
+						mapcounts[current_pte->pfn]++; // physical mem 에 mapping 
+						change_pte->pfn = current_pte->pfn; // pfn도 추가
 
-					// rw 일 때는 fork된 프로세스가 w되면 안되고 read bit만
-					if(current_pte->rw == 0x03) {
-						change_pte->rw = 0x01;
-						change_pte->private = current_pte->rw;
-					}
-					// 반대는 쓸 수 있음
-					else {
-						change_pte->rw = current_pte->rw;
-						change_pte->private = current_pte->rw;
+						// rw 일 때는 fork된 프로세스가 w되면 안되고 read bit만
+						if(current_pte->rw == 0x03) {
+							change_pte->rw = 0x01;
+							change_pte->private = current_pte->rw;
+						}
+						// 반대는 rw 가능
+						else {
+							change_pte->rw = current_pte->rw;
+							change_pte->private = current_pte->rw;
+						}
 					}
 				}
 			}
 		}
+		list_add_tail(&current->list, &processes);
 		current = change;
 		ptbr = &current->pagetable;
 	}
