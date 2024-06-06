@@ -63,8 +63,20 @@ extern unsigned int mapcounts[];
  *   Return true if the translation is cached in the TLB.
  *   Return false otherwise
  */
+
+// 0x01 => read 1 3
+// 0x02 => write 이건 출력하면 안됨
+// 0x03 => read write
 bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int *pfn)
 {
+	for(int i = 0; i < NR_TLB_ENTRIES; i++) {
+		if((tlb[i].valid == true) && (tlb[i].vpn == vpn)) {
+			if(tlb[i].rw >= rw) { 
+				*pfn = tlb[i].pfn;
+				return true;
+			}
+		}
+	}
 	return false;
 }
 
@@ -82,8 +94,26 @@ bool lookup_tlb(unsigned int vpn, unsigned int rw, unsigned int *pfn)
  */
 void insert_tlb(unsigned int vpn, unsigned int rw, unsigned int pfn)
 {
-}
 
+	// page frame만큼 반복
+	for(int i = 0; i < NR_PAGEFRAMES; i++) {
+		// 고려 해야 할 점 => tlb에 있을 때는 업데이트, 없을 때는 생성 크기는 신경 x
+		if (tlb[i].valid == true && tlb[i].vpn == vpn) {
+			tlb[i].pfn = pfn;
+			tlb[i].rw = rw;
+			break;
+		}
+		// valid bit가 없다면 
+		else if (tlb[i].valid == false) {
+			tlb[i].valid = true;
+			tlb[i].rw = rw;
+			tlb[i].pfn = pfn;
+			tlb[i].vpn = vpn;
+			tlb[i].private = rw;
+			break;
+		}
+	}
+}
 
 /**
  * alloc_page(@vpn, @rw)
@@ -131,7 +161,6 @@ unsigned int alloc_page(unsigned int vpn, unsigned int rw)
 		}
 
 	}
-
 	return -1;
 }
 
@@ -202,6 +231,35 @@ void free_page(unsigned int vpn)
  */
 bool handle_page_fault(unsigned int vpn, unsigned int rw)
 {
+	unsigned int pd_idx = vpn / NR_PTES_PER_PAGE;
+	unsigned int pte_idx = vpn % NR_PTES_PER_PAGE;
+	
+	struct pte *pte = &current->pagetable.pdes[pd_idx]->ptes[pte_idx]; // pte declare
+
+	//pte valid bit가 false거나 null이면 false를 주고
+	if (pte->valid == false || pte == NULL) {
+		return false;
+	}
+	// 나머지 경우에는 handling을 해주면 되겠네
+	else {
+		// fork했는데 private이랑 rw가 다르고, rw가 읽는 경우는 자식 프로세스가 읽는 경우니까
+		// 그에 맞게 다른 physical memory allocate 해줘야 함
+		if ((pte->private != ACCESS_READ) && (pte->rw == ACCESS_READ) && (rw > ACCESS_READ)) {
+			// mapcount가 1보다 크면 두개 이상 할당 된 거니까 다른 애로 다시 할당해야 함
+			if(mapcounts[pte->pfn] > 1) {
+				// 할당하는 함수를 불러와서 새롭게 할당해주고 해당하는 mapcount는 감소해주면 됨
+				rw = 0x03;
+				mapcounts[pte->pfn]--;
+				unsigned int new_pfn = alloc_page(vpn, rw);
+				return true;
+			}
+			// 1보다 작거나 같은 경우는 걍 할당해주면 되겠네
+			else {
+				pte->rw = 0x03;
+				return true;
+			}
+		}
+	}
 	return false;
 }
 
@@ -232,7 +290,6 @@ void switch_process(unsigned int pid)
 	list_for_each_entry(change, &processes, list) {
 		// if first process exist in process's linkded list
 		if(change->pid == pid) {
-			//list_add_tail(&current->list, &processes);
 			current = change; // current process는 pid가 같은 다른 process로 변경
 			ptbr = &current->pagetable; // ptbr은 current pagetable의 address니까 change
 			list_del_init(&change->list);
@@ -246,7 +303,7 @@ void switch_process(unsigned int pid)
 		INIT_LIST_HEAD(&change->list);
 		change->pid = pid;
 
-		// pte_directory 만큼 반복문 벅벅 why? physical 메모리에 매핑 해야 함
+		// pte_directory 만큼 반복문 why? physical 메모리에 매핑 해야 함
 		for (int i = 0; i < NR_PDES_PER_PAGE; i++) {			
 			// 이건 pte_dir 주소값 이걸로 첫번째 테이블 녀석 주소값 갖고오자 (0-3)
 			struct pte_directory *pte_dir;
@@ -266,15 +323,14 @@ void switch_process(unsigned int pid)
 						mapcounts[current_pte->pfn]++; // physical mem 에 mapping 
 						change_pte->pfn = current_pte->pfn; // pfn도 추가
 
-						// rw 일 때는 fork된 프로세스가 w되면 안되고 read bit만
+						// rw 일 때는 프로세스들이 w되면 안되고 read bit만
 						if(current_pte->rw == 0x03) {
 							change_pte->rw = 0x01;
-							change_pte->private = current_pte->rw;
+							current_pte->rw = 0x01;
 						}
 						// 반대는 rw 가능
 						else {
 							change_pte->rw = current_pte->rw;
-							change_pte->private = current_pte->rw;
 						}
 					}
 				}
@@ -283,5 +339,9 @@ void switch_process(unsigned int pid)
 		list_add_tail(&current->list, &processes);
 		current = change;
 		ptbr = &current->pagetable;
+	}
+
+	for(int i = 0; i < NR_PAGEFRAMES; i++) {
+		tlb[i].valid = false;
 	}
 }
