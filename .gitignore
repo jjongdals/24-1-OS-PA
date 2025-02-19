@@ -39,6 +39,7 @@ mash
 toy
 pipe
 sched
+vm
 
 # Debug files
 *.dSYM/
