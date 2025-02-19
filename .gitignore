@@ -37,10 +37,8 @@
 *.hex
 mash
 toy
-<<<<<<< HEAD
-=======
 pipe
->>>>>>> upstream/main
+sched
 
 # Debug files
 *.dSYM/
